@@ -36,39 +36,6 @@ const createTrafficLightController = (
       .catch(console.error)
   }
 
-  // const startTrafficCycleNew = () => {
-  //   let activeRoad: 'NS' | 'EW' = 'NS'
-  //   const nsDirections: RoadDirection[] = ['north', 'south']
-  //   const ewDirections: RoadDirection[] = ['east', 'west']
-  //
-  //   const cycle = () => {
-  //     const color = trafficLightSequence[sequenceIndex]
-  //
-  //     const activeDirections = activeRoad === 'NS' ? nsDirections : ewDirections
-  //     const inactiveDirections = activeRoad === 'NS' ? ewDirections : nsDirections
-  //
-  //     activeDirections.forEach(dir => {
-  //       trafficLights[dir].value = color
-  //       trafficLightState(dir, color)
-  //     })
-  //
-  //     inactiveDirections.forEach(dir => {
-  //       trafficLights[dir].value = 'red'
-  //       trafficLightState(dir, 'red')
-  //     })
-  //
-  //     sequenceIndex = (sequenceIndex + 1) % trafficLightSequence.length
-  //
-  //     if (sequenceIndex === 0) {
-  //       activeRoad = activeRoad === 'NS' ? 'EW' : 'NS'
-  //     }
-  //
-  //     setTimeout(cycle, 3000)
-  //   }
-  //
-  //   cycle()
-  // }
-
   const startTrafficCycleNew = () => {
     let activeRoad: 'NS' | 'EW' = 'NS'
     const nsDirections: RoadDirection[] = ['north', 'south']
