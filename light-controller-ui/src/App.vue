@@ -2,15 +2,15 @@
 import { ref, onMounted, Ref } from 'vue'
 import axios from 'axios'
 
-const trafficLightSequence = ['green', 'yellow', 'red', 'green']
 type RoadDirection = 'north' | 'south' | 'east' | 'west'
 
 interface TrafficLightController {
   directions: RoadDirection[]
   roadNum: number
   trafficLights: Record<RoadDirection, Ref<string>>
-  sequenceIndex: number
-  startTrafficCycleNew: () => void
+  startTrafficCycle: () => void
+  stopTrafficCycle: () => void
+  isTrafficCycleRunning: ref<boolean>
 }
 
 const createTrafficLightController = (
@@ -24,82 +24,104 @@ const createTrafficLightController = (
     west: ref('green')
   }
 
-  let sequenceIndex = 0
+  const isTrafficCycleRunning = ref(false)
+  let timeoutId: number | null = null
+  let activeRoad: 'NS' | 'EW' = 'NS'
 
+  // This const controls the state of the light's color. Kinda like useState in React.js
   const trafficLightState = (direction: RoadDirection, color: string) => {
     axios.post('http://localhost:8080/intersections', {
       road: roadNum,
       direction,
       activeLight: color
-    })
-      .then(console.log)
-      .catch(console.error)
+    }).catch(console.error)
   }
 
-  const startTrafficCycleNew = () => {
-    let activeRoad: 'NS' | 'EW' = 'NS'
+  const cycle = () => {
+    // Execute the cycle if the "running" flag is true
+    if (!isTrafficCycleRunning.value) return
+
     const nsDirections: RoadDirection[] = ['north', 'south']
     const ewDirections: RoadDirection[] = ['east', 'west']
+    const activeDirections = activeRoad === 'NS' ? nsDirections : ewDirections
+    const inactiveDirections = activeRoad === 'NS' ? ewDirections : nsDirections
 
-    // Start the traffic cycle with active direction being North/South and inactive being East/West
-    const cycle = () => {
-      const activeDirections = activeRoad === 'NS' ? nsDirections : ewDirections
-      const inactiveDirections = activeRoad === 'NS' ? ewDirections : nsDirections
+    activeDirections.forEach(dir => {
+      trafficLights[dir].value = 'green'
+      trafficLightState(dir, 'green')
+    })
+    inactiveDirections.forEach(dir => {
+      trafficLights[dir].value = 'red'
+      trafficLightState(dir, 'red')
+    })
 
-      // Set the active direction north/south to green
+    timeoutId = window.setTimeout(() => {
       activeDirections.forEach(dir => {
-        trafficLights[dir].value = 'green'
-        trafficLightState(dir, 'green')
-      })
-      // Set the inactive direction east/west to red
-      inactiveDirections.forEach(dir => {
-        trafficLights[dir].value = 'red'
-        trafficLightState(dir, 'red')
+        trafficLights[dir].value = 'yellow'
+        trafficLightState(dir, 'yellow')
       })
 
-      setTimeout(() => {
-        // Step 2: Yellow
+      timeoutId = window.setTimeout(() => {
         activeDirections.forEach(dir => {
-          trafficLights[dir].value = 'yellow'
-          trafficLightState(dir, 'yellow')
+          trafficLights[dir].value = 'red'
+          trafficLightState(dir, 'red')
         })
 
-        // In order to make this look like a real traffic light sequence,
-        // we want to make the red transition (where all lights are red) a short 1 second pause
-        setTimeout(() => {
-          // Step 3: Red for all (brief transition)
-          activeDirections.forEach(dir => {
-            trafficLights[dir].value = 'red'
-            trafficLightState(dir, 'red')
-          })
+        activeRoad = activeRoad === 'NS' ? 'EW' : 'NS'
 
-          // Switch active road
-          activeRoad = activeRoad === 'NS' ? 'EW' : 'NS'
-
-          // Next cycle
-          setTimeout(cycle, 1000) // brief pause before switching
-        }, 2000) // yellow duration
-      }, 3000) // green duration
-    }
-
-    cycle()
+        timeoutId = window.setTimeout(cycle, 2000)
+      }, 2000)
+    }, 3000)
   }
 
-  return { directions, roadNum, trafficLights, sequenceIndex, startTrafficCycleNew }
+  // This will triggered when the user clicks the button to start the Traffic Light Cycle
+  const startTrafficCycle = () => {
+    if (!isTrafficCycleRunning.value) {
+      isTrafficCycleRunning.value = true
+      cycle() // Run the cycle of lights for each traffic light and direction
+    }
+  }
+
+  const stopTrafficCycle = () => {
+    isTrafficCycleRunning.value = false
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId)
+      timeoutId = null
+    }
+
+    // When this button is clicked we want to turn off all lights.
+    Object.keys(trafficLights).forEach(dir => {
+      const direction = dir as RoadDirection
+      trafficLights[direction].value = 'off'
+      trafficLightState(direction, 'off')
+    })
+  }
+
+  return {
+    directions,
+    roadNum,
+    trafficLights,
+    startTrafficCycle,
+    stopTrafficCycle,
+    isTrafficCycleRunning
+  }
 }
 
-const northSouthRoad = createTrafficLightController(1, ['north', 'south'])
-const eastWestRoad = createTrafficLightController(2, ['east', 'west'])
+const controller = createTrafficLightController(1, ['north', 'south', 'east', 'west'])
 
-onMounted(() => {
-  northSouthRoad.startTrafficCycleNew()
-  eastWestRoad.startTrafficCycleNew()
-})
+const activeLightNorth = controller.trafficLights.north
+const activeLightSouth = controller.trafficLights.south
+const activeLightEast = controller.trafficLights.east
+const activeLightWest = controller.trafficLights.west
+const isTrafficCycleRunning = controller.isTrafficCycleRunning
 
-const activeLightEast = eastWestRoad.trafficLights.east
-const activeLightWest = eastWestRoad.trafficLights.west
-const activeLightNorth = northSouthRoad.trafficLights.north
-const activeLightSouth = northSouthRoad.trafficLights.south
+const toggleCycle = () => {
+  if (isTrafficCycleRunning.value) {
+    controller.stopTrafficCycle()
+  } else {
+    controller.startTrafficCycle()
+  }
+}
 </script>
 
 <template>
@@ -110,11 +132,17 @@ const activeLightSouth = northSouthRoad.trafficLights.south
   </header>
 
     <main>
-
+      <div>
+        <button
+          @click="toggleCycle"
+          :class="{ stop: isTrafficCycleRunning }">
+          {{ isTrafficCycleRunning ? 'Stop' : 'Start' }} Traffic Light Cycle
+        </button>
+      </div>
       <div class="diamond-grid">
         <!-- Top Row: Road 1 -->
         <div class="light-controller north">
-          <p>Traffic Light 1 - Road 1: {{ activeLightNorth }}</p>
+          <p>Northbound Traffic Light: {{ activeLightNorth === 'off' ? 'OFF' : activeLightNorth }}</p>
           <div class="light">
             <label><input type="radio" value="green" class="green" v-model="activeLightNorth" /> Green</label>
             <label><input type="radio" value="yellow" class="yellow" v-model="activeLightNorth" /> Yellow</label>
@@ -123,7 +151,7 @@ const activeLightSouth = northSouthRoad.trafficLights.south
         </div>
 
         <div class="light-controller west">
-          <p>Traffic Light 2 - Road 1: {{ activeLightWest }}</p>
+          <p>Westbound Traffic Light: {{ activeLightWest === 'off' ? 'OFF' : activeLightWest }}</p>
           <div class="light">
             <label><input type="radio" value="green" class="green" v-model="activeLightWest" /> Green</label>
             <label><input type="radio" value="yellow" class="yellow" v-model="activeLightWest" /> Yellow</label>
@@ -133,7 +161,7 @@ const activeLightSouth = northSouthRoad.trafficLights.south
 
         <!-- Bottom Row: Road 2 -->
         <div class="light-controller east">
-          <p>Traffic Light 1 - Road 2: {{ activeLightEast }}</p>
+          <p>Eastbound Traffic Light: {{ activeLightEast === 'off' ? 'OFF' : activeLightEast }}</p>
           <div class="light">
             <label><input type="radio" value="green" class="green" v-model="activeLightEast" /> Green</label>
             <label><input type="radio" value="yellow" class="yellow" v-model="activeLightEast" /> Yellow</label>
@@ -142,7 +170,7 @@ const activeLightSouth = northSouthRoad.trafficLights.south
         </div>
 
         <div class="light-controller south">
-          <p>Traffic Light 2 - Road 2: {{ activeLightSouth }}</p>
+          <p>Southbound Traffic Light: {{ activeLightSouth === 'off' ? 'OFF' : activeLightSouth }}</p>
           <div class="light">
             <label><input type="radio" value="green" class="green" v-model="activeLightSouth" /> Green</label>
             <label><input type="radio" value="yellow" class="yellow" v-model="activeLightSouth" /> Yellow</label>
@@ -203,11 +231,6 @@ header {
 .west {
   grid-area: west;
 }
-.intersection-label {
-  grid-area: center;
-  font-size: 2rem;
-  text-align: center;
-}
 
 .light-controller {
   display: grid;
@@ -231,5 +254,32 @@ input[type='radio'].yellow {
 
 input[type='radio'].green {
   accent-color: #2dc937;
+}
+
+button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background-color: #2dc937; /* green for start */
+  color: white;
+  transition: background-color 0.3s ease;
+  margin: 1rem auto;
+  display: block;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+  background-color: #28a745;
+}
+
+button.stop {
+  background-color: #cc3232; /* red for stop */
+}
+
+button.stop:hover {
+  background-color: #b02a2a;
 }
 </style>
