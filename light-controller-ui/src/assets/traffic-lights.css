@@ -1,0 +1,189 @@
+header {
+  line-height: 1.5;
+}
+
+.intersection-layout {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 2rem;
+  padding: 1rem;
+  flex-wrap: wrap; /* optional: allows wrapping on smaller screens */
+}
+
+.logo {
+  display: block;
+  margin: 0 auto 2rem;
+}
+
+@media (min-width: 1024px) {
+  header {
+    display: flex;
+    place-items: center;
+    margin: calc(var(--section-gap) / 4);
+  }
+
+  header .wrapper {
+    display: flex;
+    place-items: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+.diamond-grid {
+  display: grid;
+  grid-template-areas:
+    ". north ."
+    "west center east"
+    ". south .";
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 2rem;
+  justify-items: center;
+  align-items: center;
+  margin-top: 2rem;
+}
+
+.north {
+  grid-area: north;
+}
+.south {
+  grid-area: south;
+}
+.east {
+  grid-area: east;
+}
+.west {
+  grid-area: west;
+}
+
+.light-controller {
+  display: grid;
+  place-items: center;
+  gap: 1rem;
+
+  .light {
+    display: grid;
+    gap: .5rem;
+  }
+
+}
+
+input[type='radio'].red {
+  accent-color: #cc3232;
+  transform: scale(2.5); /* Increase size by 1.5x */
+  margin-right: 8px;     /* Add spacing between radio and label text */
+}
+
+input[type='radio'].yellow {
+  accent-color: #e7b416;
+  transform: scale(2.5); /* Increase size by 1.5x */
+  margin-right: 8px;     /* Add spacing between radio and label text */
+}
+
+input[type='radio'].green {
+  accent-color: #2dc937;
+  transform: scale(2.5); /* Increase size by 1.5x */
+  margin-right: 8px;     /* Add spacing between radio and label text */
+}
+
+.traffic-radio input[type="radio"] {
+  appearance: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid #333;
+  margin-right: 8px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.traffic-radio input[type="radio"]:checked {
+  background-color: green; /* You can dynamically change this based on direction or state */
+}
+
+.traffic-radio input[type="radio"]:hover {
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.3);
+}
+
+
+button {
+  padding: 0.75rem 1.5rem;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  background-color: #2dc937; /* green for start */
+  color: white;
+  transition: background-color 0.3s ease;
+  margin: 1rem auto;
+  display: block;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+button:hover {
+  background-color: #28a745;
+}
+
+button.stop {
+  background-color: #cc3232; /* red for stop */
+}
+
+button.stop:hover {
+  background-color: #b02a2a;
+}
+
+.controller-panel {
+  flex: 0 0 300px; /* fixed width */
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  border: 2px solid #ccc;
+  padding: 1rem;
+  border-radius: 12px;
+  background-color: #f9f9f9;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.1);
+}
+
+.light-buttons button {
+  padding: 0.5rem 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 6px;
+  background-color: #444;
+  color: white;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.light-buttons button:hover {
+  background-color: #666;
+}
+
+.test-light-panel {
+  border: 2px dashed #aaa;
+  padding: 1rem;
+  border-radius: 10px;
+  margin-top: 2rem;
+  text-align: center;
+  background-color: #f0f0f0;
+}
+
+.direction-selector {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.direction-selector label {
+  font-weight: bold;
+  cursor: pointer;
+  color: #181818;
+}
+
+button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
