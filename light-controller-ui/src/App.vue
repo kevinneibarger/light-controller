@@ -1,42 +1,138 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, Ref } from 'vue'
 import axios from 'axios'
 
-// lights cycle through colors in order: Green -> Yellow -> Red -> Green
 const trafficLightSequence = ['green', 'yellow', 'red', 'green']
+type RoadDirection = 'north' | 'south' | 'east' | 'west'
 
-// We have two roads at an intersection, with four traffic lights
-// So, we have active lights on 4 sides, 2 for each road
-const activeLightRoad1TL1 = ref<string>('green')
-const activeLightRoad1TL2 = ref<string>('red')
-const activeLightRoad2TL1 = ref<string>('green')
-const activeLightRoad2TL2 = ref<string>('red')
-
-
-// This const will handle each active light change by calling the Spring boot rest api and setting to the current road and light
-const handleActiveLightChange = (road : number, trafficLight : string) => {
-  axios.post('http://localhost:8080/intersections', { road, activeLight: activeLightRoad1TL1.value })
-    .then(console.log)
-    .catch(console.error)
+interface TrafficLightController {
+  directions: RoadDirection[]
+  roadNum: number
+  trafficLights: Record<RoadDirection, Ref<string>>
+  sequenceIndex: number
+  startTrafficCycleNew: () => void
 }
 
-// This const will iterate through the light cycle for each interval and set the light value to the next color in the sequence
-const cycleTrafficLight = (lightRef: typeof activeLightRoad1TL1, road: number, interval: number) => {
-  let index = 0
-  setInterval(() => {
-    index = (index + 1) % trafficLightSequence.length
-    lightRef.value = trafficLightSequence[index]
-    handleActiveLightChange(road, lightRef.value)
-  }, interval)
+const createTrafficLightController = (
+  roadNum: number,
+  directions: RoadDirection[]
+): TrafficLightController => {
+  const trafficLights: Record<RoadDirection, Ref<string>> = {
+    north: ref('red'),
+    south: ref('red'),
+    east: ref('green'),
+    west: ref('green')
+  }
+
+  let sequenceIndex = 0
+
+  const trafficLightState = (direction: RoadDirection, color: string) => {
+    axios.post('http://localhost:8080/intersections', {
+      road: roadNum,
+      direction,
+      activeLight: color
+    })
+      .then(console.log)
+      .catch(console.error)
+  }
+
+  // const startTrafficCycleNew = () => {
+  //   let activeRoad: 'NS' | 'EW' = 'NS'
+  //   const nsDirections: RoadDirection[] = ['north', 'south']
+  //   const ewDirections: RoadDirection[] = ['east', 'west']
+  //
+  //   const cycle = () => {
+  //     const color = trafficLightSequence[sequenceIndex]
+  //
+  //     const activeDirections = activeRoad === 'NS' ? nsDirections : ewDirections
+  //     const inactiveDirections = activeRoad === 'NS' ? ewDirections : nsDirections
+  //
+  //     activeDirections.forEach(dir => {
+  //       trafficLights[dir].value = color
+  //       trafficLightState(dir, color)
+  //     })
+  //
+  //     inactiveDirections.forEach(dir => {
+  //       trafficLights[dir].value = 'red'
+  //       trafficLightState(dir, 'red')
+  //     })
+  //
+  //     sequenceIndex = (sequenceIndex + 1) % trafficLightSequence.length
+  //
+  //     if (sequenceIndex === 0) {
+  //       activeRoad = activeRoad === 'NS' ? 'EW' : 'NS'
+  //     }
+  //
+  //     setTimeout(cycle, 3000)
+  //   }
+  //
+  //   cycle()
+  // }
+
+  const startTrafficCycleNew = () => {
+    let activeRoad: 'NS' | 'EW' = 'NS'
+    const nsDirections: RoadDirection[] = ['north', 'south']
+    const ewDirections: RoadDirection[] = ['east', 'west']
+
+    // Start the traffic cycle with active direction being North/South and inactive being East/West
+    const cycle = () => {
+      const activeDirections = activeRoad === 'NS' ? nsDirections : ewDirections
+      const inactiveDirections = activeRoad === 'NS' ? ewDirections : nsDirections
+
+      // Set the active direction north/south to green
+      activeDirections.forEach(dir => {
+        trafficLights[dir].value = 'green'
+        trafficLightState(dir, 'green')
+      })
+      // Set the inactive direction east/west to red
+      inactiveDirections.forEach(dir => {
+        trafficLights[dir].value = 'red'
+        trafficLightState(dir, 'red')
+      })
+
+      setTimeout(() => {
+        // Step 2: Yellow
+        activeDirections.forEach(dir => {
+          trafficLights[dir].value = 'yellow'
+          trafficLightState(dir, 'yellow')
+        })
+
+        // In order to make this look like a real traffic light sequence,
+        // we want to make the red transition (where all lights are red) a short 1 second pause
+        setTimeout(() => {
+          // Step 3: Red for all (brief transition)
+          activeDirections.forEach(dir => {
+            trafficLights[dir].value = 'red'
+            trafficLightState(dir, 'red')
+          })
+
+          // Switch active road
+          activeRoad = activeRoad === 'NS' ? 'EW' : 'NS'
+
+          // Next cycle
+          setTimeout(cycle, 1000) // brief pause before switching
+        }, 2000) // yellow duration
+      }, 3000) // green duration
+    }
+
+    cycle()
+  }
+
+  return { directions, roadNum, trafficLights, sequenceIndex, startTrafficCycleNew }
 }
+
+const northSouthRoad = createTrafficLightController(1, ['north', 'south'])
+const eastWestRoad = createTrafficLightController(2, ['east', 'west'])
 
 onMounted(() => {
-  cycleTrafficLight(activeLightRoad1TL1, 1, 3000) // Road 1 Traffic Light 1 will change every 5 seconds
-  cycleTrafficLight(activeLightRoad1TL2, 1, 5000)
-  cycleTrafficLight(activeLightRoad2TL1, 2, 3000)
-  cycleTrafficLight(activeLightRoad2TL2, 2, 5000)
+  northSouthRoad.startTrafficCycleNew()
+  eastWestRoad.startTrafficCycleNew()
 })
 
+const activeLightEast = eastWestRoad.trafficLights.east
+const activeLightWest = eastWestRoad.trafficLights.west
+const activeLightNorth = northSouthRoad.trafficLights.north
+const activeLightSouth = northSouthRoad.trafficLights.south
 </script>
 
 <template>
@@ -51,81 +147,43 @@ onMounted(() => {
       <div class="diamond-grid">
         <!-- Top Row: Road 1 -->
         <div class="light-controller north">
-          <p>Traffic Light 1 - Road 1: {{ activeLightRoad1TL1 }}</p>
+          <p>Traffic Light 1 - Road 1: {{ activeLightNorth }}</p>
           <div class="light">
-            <label><input type="radio" value="green" class="green" v-model="activeLightRoad1TL1" /> Green</label>
-            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightRoad1TL1" /> Yellow</label>
-            <label><input type="radio" value="red" class="red" v-model="activeLightRoad1TL1" /> Red</label>
+            <label><input type="radio" value="green" class="green" v-model="activeLightNorth" /> Green</label>
+            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightNorth" /> Yellow</label>
+            <label><input type="radio" value="red" class="red" v-model="activeLightNorth" /> Red</label>
           </div>
         </div>
 
         <div class="light-controller west">
-          <p>Traffic Light 2 - Road 1: {{ activeLightRoad1TL2 }}</p>
+          <p>Traffic Light 2 - Road 1: {{ activeLightWest }}</p>
           <div class="light">
-            <label><input type="radio" value="green" class="green" v-model="activeLightRoad1TL2" /> Green</label>
-            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightRoad1TL2" /> Yellow</label>
-            <label><input type="radio" value="red" class="red" v-model="activeLightRoad1TL2" /> Red</label>
+            <label><input type="radio" value="green" class="green" v-model="activeLightWest" /> Green</label>
+            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightWest" /> Yellow</label>
+            <label><input type="radio" value="red" class="red" v-model="activeLightWest" /> Red</label>
           </div>
         </div>
 
         <!-- Bottom Row: Road 2 -->
         <div class="light-controller east">
-          <p>Traffic Light 1 - Road 2: {{ activeLightRoad2TL1 }}</p>
+          <p>Traffic Light 1 - Road 2: {{ activeLightEast }}</p>
           <div class="light">
-            <label><input type="radio" value="green" class="green" v-model="activeLightRoad2TL1" /> Green</label>
-            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightRoad2TL1" /> Yellow</label>
-            <label><input type="radio" value="red" class="red" v-model="activeLightRoad2TL1" /> Red</label>
+            <label><input type="radio" value="green" class="green" v-model="activeLightEast" /> Green</label>
+            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightEast" /> Yellow</label>
+            <label><input type="radio" value="red" class="red" v-model="activeLightEast" /> Red</label>
           </div>
         </div>
 
         <div class="light-controller south">
-          <p>Traffic Light 2 - Road 2: {{ activeLightRoad2TL2 }}</p>
+          <p>Traffic Light 2 - Road 2: {{ activeLightSouth }}</p>
           <div class="light">
-            <label><input type="radio" value="green" class="green" v-model="activeLightRoad2TL2" /> Green</label>
-            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightRoad2TL2" /> Yellow</label>
-            <label><input type="radio" value="red" class="red" v-model="activeLightRoad2TL2" /> Red</label>
+            <label><input type="radio" value="green" class="green" v-model="activeLightSouth" /> Green</label>
+            <label><input type="radio" value="yellow" class="yellow" v-model="activeLightSouth" /> Yellow</label>
+            <label><input type="radio" value="red" class="red" v-model="activeLightSouth" /> Red</label>
           </div>
         </div>
       </div>
     </main>
-
-
-<!--  <main>-->
-<!--    <div class="light-controller">-->
-<!--      <p>Active light Road 1: {{ activeLightRoad1 }}</p>-->
-<!--      <div class="light">-->
-<!--        <label>-->
-<!--          <input type="radio" value="red" class="red" v-model="activeLightRoad1" name="light"-->
-<!--            @change="handleActiveLightChange" /> Red-->
-<!--        </label>-->
-<!--        <label>-->
-<!--          <input type="radio" value="yellow" class="yellow" v-model="activeLightRoad1" name="light"-->
-<!--            @change="handleActiveLightChange" /> Yellow-->
-<!--        </label>-->
-<!--        <label>-->
-<!--          <input type="radio" value="green" class="green" v-model="activeLightRoad1" name="light"-->
-<!--            @change="handleActiveLightChange" /> Green-->
-<!--        </label>-->
-<!--      </div>-->
-<!--    </div>-->
-<!--    <div class="light-controller">-->
-<!--      <p>Active light Road 2: {{ activeLightRoad2 }}</p>-->
-<!--      <div class="light">-->
-<!--        <label>-->
-<!--          <input type="radio" value="red" class="red" v-model="activeLightRoad2" name="light"-->
-<!--                 @change="handleActiveLightChange" /> Red-->
-<!--        </label>-->
-<!--        <label>-->
-<!--          <input type="radio" value="yellow" class="yellow" v-model="activeLightRoad2" name="light"-->
-<!--                 @change="handleActiveLightChange" /> Yellow-->
-<!--        </label>-->
-<!--        <label>-->
-<!--          <input type="radio" value="green" class="green" v-model="activeLightRoad2" name="light"-->
-<!--                 @change="handleActiveLightChange" /> Green-->
-<!--        </label>-->
-<!--      </div>-->
-<!--    </div>-->
-<!--  </main>-->
 </template>
 
 <style scoped>
@@ -151,14 +209,6 @@ header {
     flex-wrap: wrap;
   }
 }
-
-/*.intersection-grid {
-//  display: grid;
-//  grid-template-columns: repeat(2, 1fr);
-//  grid-template-rows: repeat(2, auto);
-//  gap: 2rem;
-//  margin-top: 2rem;
-}*/
 
 .diamond-grid {
   display: grid;
